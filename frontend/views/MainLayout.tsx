@@ -20,8 +20,11 @@ export default function MainLayout() {
             <NavLink className={navLinkClasses} to="/">
               Hello World
             </NavLink>
-            <NavLink className={navLinkClasses} to="/about">
-              About
+            <NavLink className={navLinkClasses} to="/cursors">
+              Cursors
+            </NavLink>
+            <NavLink className={navLinkClasses} to="/todos">
+              TodoMVC
             </NavLink>
           </nav>
         </header>
