@@ -1,25 +1,32 @@
 import { Signal, batch, useComputed, useSignal } from "@preact/signals-react";
-import { FakeGeneratedService, Todo } from "../lib/generated/FakeGeneratedService";
+
+interface Todo {
+    id: string,
+    label: string,
+    done: boolean;
+}
 
 enum Filter {
     ALL, ACTIVE, COMPLETED
 }
 
-function markAllDone(done: boolean) {
-    todos.forEach((todo, key) => todo.done != done && todos.set(key, {...todo, done}))
-}
-
-const todos = FakeGeneratedService.todos();
-
-export default function SharedTodoMVC() {
+export default function TodoMVC() {
+    const todos = useSignal<Todo[]>([]);
     const filter = useSignal(Filter.ALL);
 
     // [todo.id, input.value?]
     const editState = useSignal<[string, string] | [null]>([null]);
 
-    // Could be shared computed() instead but leaving them here to avoid noise in the diff
-    const remaining = useComputed(() => todos.items.filter((todo) => !todo.done).length);
-    const completed = useComputed(() => todos.items.length - remaining.value );
+    function updateTodo(updated: Todo) {
+        todos.value = todos.value.map(todo => todo.id == updated.id ? updated : todo)
+    }
+    
+    function markAllDone(done: boolean) {
+        todos.value = todos.value.map(todo => todo.done != done ? {...todo, done} : todo)
+    }        
+
+    const remaining = useComputed(() => todos.value.filter((todo) => !todo.done).length);
+    const completed = useComputed(() => todos.value.length - remaining.value );
     const leftLabel = useComputed(() => `${remaining.value} item${remaining.value != 1 ? 's' : ''}`);
 
     return (
@@ -32,26 +39,28 @@ export default function SharedTodoMVC() {
             <div>
                 What needs to be done? <input onKeyUp={(event) => {
                     if (event.key == 'Enter') {
-                        todos.insertLast({
+                        todos.value = [...todos.value, {
+                            id: crypto.randomUUID(),
                             label: event.currentTarget.value,
                             done: false
-                        });
+                        }];
                         event.currentTarget.value = '';
                     }
                 }} />
             </div>
             <ul>
-                { todos.value.filter(({value: todo}) => {
+                { todos.value.filter((todo) => {
                     return filter.value == Filter.ALL || (filter.value == Filter.COMPLETED) == todo.done;
-                }).map(({key, value: todo}) => {
+                }).map((todo) => {
+                    const key = todo.id;
                     return <li key={key}>
                         <input type="checkbox" checked={todo.done} onChange={(event) => {
-                            todos.set(key, {...todo, done: event.currentTarget.checked});
+                            updateTodo({...todo, done: event.currentTarget.checked})
                         }} />
                         { editState.value[0] != key
                             ? <span onDoubleClick={() => editState.value = [key, todo.label]}>
                                 { todo.label }
-                                <button onClick={() => todos.remove(key)}>x</button>
+                                <button onClick={() => todos.value = todos.value.filter((t) => t.id != key)}>x</button>
                             </span>
                             : <input autoFocus value={ editState.value[1] }
                                 onChange={(event) => editState.value = [key, event.currentTarget.value]}
@@ -64,7 +73,7 @@ export default function SharedTodoMVC() {
                                 }}
                                 onBlur={(event) => {
                                     batch(() => {
-                                        todos.set(key, { ...todo, label: event.currentTarget.value });
+                                        updateTodo({ ...todo, label: event.currentTarget.value });
                                         editState.value = [null];    
                                     })
                                 }} />
@@ -78,7 +87,7 @@ export default function SharedTodoMVC() {
                 <button disabled={filter.value == Filter.ACTIVE} onClick={() => filter.value = Filter.ACTIVE}>Active</button>
                 <button disabled={filter.value == Filter.COMPLETED} onClick={() => filter.value = Filter.COMPLETED}>Completed</button>
                 { completed.value > 0 ? <button onClick={() => {
-                    todos.forEach((todo, key) => todo.done && todos.remove(key));
+                    todos.value = todos.value.filter((todo) => !todo.done);
                 }}>Clear completed</button> : null }
             </div>
         </div>

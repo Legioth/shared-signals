@@ -21,6 +21,7 @@ public class HelloWorldService {
     private final SignalQueue cursors;
     private final SignalQueue list;
     private final SignalQueue value;
+    private final SignalQueue todos;
 
     public HelloWorldService(ObjectMapper mapper) {
         Objects.requireNonNull(mapper);
@@ -29,6 +30,7 @@ public class HelloWorldService {
         cursors = new SignalQueue(mapper, RootType.LIST);
         list = new SignalQueue(mapper, RootType.LIST);
         value = new SignalQueue(mapper, RootType.VALUE);
+        todos = new SignalQueue(mapper, RootType.LIST);
     }
 
     public Flux<String> subscribeValue(@Nullable UUID continueFrom) {
@@ -53,5 +55,13 @@ public class HelloWorldService {
 
     public void updateCursors(String event) {
         cursors.submit(JsonEvent.fromJson(event, mapper));
+    }
+
+    public Flux<String> subscribeTodos(@Nullable UUID continueFrom) {
+        return todos.subscribe(continueFrom).map(event -> event.toJson(mapper));
+    }
+
+    public void updateTodos(String event) {
+        todos.submit(JsonEvent.fromJson(event, mapper));
     }
 }

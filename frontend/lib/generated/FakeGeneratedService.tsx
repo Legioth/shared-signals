@@ -38,4 +38,14 @@ export class FakeGeneratedService {
     const valueLog = new EventLog<ValueSignal<string>>(queue, {initialValue: "", ...options}, EntryType.VALUE);
     return valueLog.getRoot();
   }
+
+  static todos() {
+    const queue = {
+      subscribe: HelloWorldService.subscribeTodos,
+      publish: HelloWorldService.updateTodos,
+    };
+    
+    const valueLog = new EventLog<ListSignal<Todo, ValueSignal<Todo>>>(queue, {}, EntryType.LIST);
+    return valueLog.getRoot();
+  }  
 }
