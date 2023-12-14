@@ -48,4 +48,14 @@ export class FakeGeneratedService {
     const valueLog = new EventLog<ListSignal<Todo, ValueSignal<Todo>>>(queue, {}, EntryType.LIST);
     return valueLog.getRoot();
   }  
+
+  static counter() {
+    const queue = {
+      subscribe: HelloWorldService.subscribeCounter,
+      publish: HelloWorldService.updateCounter,
+    };
+    
+    const valueLog = new EventLog<ValueSignal<number>>(queue, {delay: true, initialValue: 0 }, EntryType.VALUE);
+    return valueLog.getRoot();
+  }  
 }

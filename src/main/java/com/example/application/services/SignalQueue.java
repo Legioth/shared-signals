@@ -40,14 +40,15 @@ public class SignalQueue extends EventQueue<JsonEvent> {
     private final Map<UUID, Entry> entries = new HashMap<>();
     private final ObjectMapper mapper;
 
-    public SignalQueue(ObjectMapper mapper, RootType rootType) {
+    public SignalQueue(ObjectMapper mapper, JsonNode defaultValue) {
         this.mapper = mapper;
 
-        JsonNode rootValue = switch(rootType) {
-            case RootType.LIST -> createListRootValue(null, null);
-            case RootType.VALUE -> TextNode.valueOf(""); // Good enough for now
-            default -> throw new RuntimeException(rootType.name());
-        };
+        JsonNode rootValue;
+        if (defaultValue != null) {
+            rootValue = defaultValue;
+        } else {
+            rootValue = createListRootValue(null, null);
+        }        
         entries.put(EventQueue.ROOT, new Entry(EventQueue.ROOT, null, null, rootValue));
     }
 

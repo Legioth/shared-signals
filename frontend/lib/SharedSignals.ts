@@ -612,7 +612,12 @@ export class ValueSignal<T> extends SharedSignal<T> {
     const event : SetEvent = { id, set: this.key, value: newValue, conditions: [{id: this.key, value: expectedValue}]};
 
      return this.eventLog.publish(event, eager);
-   }    
+  }
+
+  async update(updater: (value: T) => T): Promise<void> {
+    // TODO detect accessing other signals and re-run if any of those are changed as well
+    while(!(await this.compareAndSet(this.value, updater(this.value)))) { }
+  }
 }
 
 export class ListSignal<T = any, S extends SharedSignal<T> = SharedSignal<T>> extends SharedSignal<S[]> {

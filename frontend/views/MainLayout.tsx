@@ -26,6 +26,9 @@ export default function MainLayout() {
             <NavLink className={navLinkClasses} to="/todos">
               TodoMVC
             </NavLink>
+            <NavLink className={navLinkClasses} to="/counter">
+              Counter
+            </NavLink>
           </nav>
         </header>
       </div>

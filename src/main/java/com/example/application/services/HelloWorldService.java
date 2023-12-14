@@ -1,7 +1,8 @@
 package com.example.application.services;
 
-import com.example.application.services.SignalQueue.RootType;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.IntNode;
+import com.fasterxml.jackson.databind.node.TextNode;
 import com.vaadin.flow.server.auth.AnonymousAllowed;
 import dev.hilla.BrowserCallable;
 import dev.hilla.Nullable;
@@ -22,15 +23,17 @@ public class HelloWorldService {
     private final SignalQueue list;
     private final SignalQueue value;
     private final SignalQueue todos;
+    private final SignalQueue counter;
 
     public HelloWorldService(ObjectMapper mapper) {
         Objects.requireNonNull(mapper);
         this.mapper = mapper;
 
-        cursors = new SignalQueue(mapper, RootType.LIST);
-        list = new SignalQueue(mapper, RootType.LIST);
-        value = new SignalQueue(mapper, RootType.VALUE);
-        todos = new SignalQueue(mapper, RootType.LIST);
+        cursors = new SignalQueue(mapper, null);
+        list = new SignalQueue(mapper, null);
+        value = new SignalQueue(mapper, TextNode.valueOf(""));
+        todos = new SignalQueue(mapper, null);
+        counter = new SignalQueue(mapper, IntNode.valueOf(0));
     }
 
     public Flux<String> subscribeValue(@Nullable UUID continueFrom) {
@@ -63,5 +66,13 @@ public class HelloWorldService {
 
     public void updateTodos(String event) {
         todos.submit(JsonEvent.fromJson(event, mapper));
+    }
+
+    public Flux<String> subscribeCounter(@Nullable UUID continueFrom) {
+        return counter.subscribe(continueFrom).map(event -> event.toJson(mapper));
+    }
+
+    public void updateCounter(String event) {
+        counter.submit(JsonEvent.fromJson(event, mapper));
     }
 }
