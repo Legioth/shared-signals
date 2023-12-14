@@ -45,7 +45,7 @@ export enum EntryType {
   LIST,
 }
 
-interface ModifiableEntry<T= any> {
+interface ModifiableEntry<T = any> {
   value: T;
   next: EntryId | null;
   prev: EntryId | null;
@@ -693,9 +693,9 @@ export class ListSignal<T = any, S extends SharedSignal<T> = SharedSignal<T>> ex
     this.eventLog.publish(event, true);
   }
 
-  mapWithKey(mapper: (item: Signal<T>) => ReactElement): ReactElement[] {
+  mapWithKey(mapper: (item: T, key: string) => ReactElement): ReactElement[] {
     return this.value.map((signal) => {
-      const result = mapper.call(null, signal);
+      const result = mapper.call(null, signal.value, signal.key);
       if (result.key) {
         return result;
       } else {

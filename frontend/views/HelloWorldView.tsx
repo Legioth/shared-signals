@@ -35,7 +35,7 @@ export default function HelloWorldView() {
         <Button disabled={listSignal.value.length == 0} onClick={event => listSignal.remove(listSignal.keys[0]) }>Remove first</Button>
       </HorizontalLayout>
       <ol>
-        { listSignal.mapWithKey((signal) => <li>{signal}</li>) }
+        { listSignal.mapWithKey((value) => <li>{value}</li>) }
       </ol>
       <div>Length: {listLength}</div>
     </>
