@@ -108,14 +108,12 @@ class State {
       for(const condition of event.conditions) {
         const entry = this.get(condition.id);
         if (!entry) {
-          console.log("Failed condition because entry doesn't exist")
           return false;
         }
 
         if (condition.value !== undefined) {
           // Poor man's deep equals
           if (JSON.stringify(entry.value) !== JSON.stringify(condition.value)) {
-            console.log("Failed condition because of different values");
             return false;
           }
         }
