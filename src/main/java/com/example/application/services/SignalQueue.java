@@ -11,7 +11,6 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.fasterxml.jackson.databind.node.TextNode;
 
 public class SignalQueue extends EventQueue<JsonEvent> {
     public enum RootType {
@@ -75,6 +74,10 @@ public class SignalQueue extends EventQueue<JsonEvent> {
 
         if (json.has("set")) {
             Entry entry = entry(json.get("set"));
+            if (entry == null) {
+                // Ignore request for entry that might just have been removed
+                return;
+            }
             entry.value = json.get("value");
         } else if (json.has("remove")) {
             Entry parent = entry(json.get("parent"));
