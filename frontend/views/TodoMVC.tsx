@@ -1,4 +1,4 @@
-import { Signal, batch, useComputed, useSignal } from "@preact/signals-react";
+import { Signal, batch, computed, useComputed, useSignal } from "@preact/signals-react";
 import { FakeGeneratedService, Todo } from "../lib/generated/FakeGeneratedService";
 
 enum Filter {
@@ -6,10 +6,17 @@ enum Filter {
 }
 
 function markAllDone(done: boolean) {
-    todos.forEach((todo, key) => todo.done != done && todos.set(key, {...todo, done}))
+    todoSignals.value.forEach((signal) => {
+        const todo = signal.value;
+        if (todo.done != done) {
+            signal.value = { ...todo, done }
+        }
+    })
 }
 
-const todos = FakeGeneratedService.todos();
+const todoSignals = FakeGeneratedService.todos();
+const todos = todoSignals.items;
+const entries = todoSignals.entries;
 
 export default function SharedTodoMVC() {
     const filter = useSignal(Filter.ALL);
@@ -18,8 +25,8 @@ export default function SharedTodoMVC() {
     const editState = useSignal<[string, string] | [null]>([null]);
 
     // Could be shared computed() instead but leaving them here to avoid noise in the diff
-    const remaining = useComputed(() => todos.items.filter((todo) => !todo.done).length);
-    const completed = useComputed(() => todos.items.length - remaining.value );
+    const remaining = useComputed(() => todos.value.filter((todo) => !todo.done).length);
+    const completed = useComputed(() => todos.value.length - remaining.value );
     const leftLabel = useComputed(() => `${remaining.value} item${remaining.value != 1 ? 's' : ''}`);
 
     return (
@@ -32,7 +39,7 @@ export default function SharedTodoMVC() {
             <div>
                 What needs to be done? <input onKeyUp={(event) => {
                     if (event.key == 'Enter') {
-                        todos.insertLast({
+                        todoSignals.insertLast({
                             label: event.currentTarget.value,
                             done: false
                         });
@@ -41,17 +48,18 @@ export default function SharedTodoMVC() {
                 }} />
             </div>
             <ul>
-                { todos.value.filter(({value: todo}) => {
+                { todoSignals.value.filter(({value: todo}) => {
                     return filter.value == Filter.ALL || (filter.value == Filter.COMPLETED) == todo.done;
-                }).map(({key, value: todo}) => {
+                }).map((signal) => {
+                    const {key, value: todo} = signal;
                     return <li key={key}>
                         <input type="checkbox" checked={todo.done} onChange={(event) => {
-                            todos.set(key, {...todo, done: event.currentTarget.checked});
+                            signal.value = {...todo, done: event.currentTarget.checked};
                         }} />
                         { editState.value[0] != key
                             ? <span onDoubleClick={() => editState.value = [key, todo.label]}>
                                 { todo.label }
-                                <button onClick={() => todos.remove(key)}>x</button>
+                                <button onClick={() => todoSignals.remove(key)}>x</button>
                             </span>
                             : <input autoFocus value={ editState.value[1] }
                                 onChange={(event) => editState.value = [key, event.currentTarget.value]}
@@ -64,7 +72,7 @@ export default function SharedTodoMVC() {
                                 }}
                                 onBlur={(event) => {
                                     batch(() => {
-                                        todos.set(key, { ...todo, label: event.currentTarget.value });
+                                        signal.value = { ...todo, label: event.currentTarget.value };
                                         editState.value = [null];    
                                     })
                                 }} />
@@ -78,7 +86,7 @@ export default function SharedTodoMVC() {
                 <button disabled={filter.value == Filter.ACTIVE} onClick={() => filter.value = Filter.ACTIVE}>Active</button>
                 <button disabled={filter.value == Filter.COMPLETED} onClick={() => filter.value = Filter.COMPLETED}>Completed</button>
                 { completed.value > 0 ? <button onClick={() => {
-                    todos.forEach((todo, key) => todo.done && todos.remove(key));
+                    entries.value.forEach(([todo, key]) => todo.done && todoSignals.remove(key));
                 }}>Clear completed</button> : null }
             </div>
         </div>

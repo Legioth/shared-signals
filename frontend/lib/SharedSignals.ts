@@ -92,6 +92,7 @@ interface SnapshotEvent extends StateEvent {
 }
 
 type EntryId = string;
+type EntryReference<S = SharedSignal<any>> = EntryId | S;
 type Entries = Map<EntryId, Entry | undefined>;
 
 class State {
@@ -571,9 +572,10 @@ const defaultOptions : FullSignalOptions = {
 
 type SignalOptions = Partial<FullSignalOptions>;
   
-interface ListInsertResult {
-  readonly key: string,
-  readonly promise: Promise<boolean>
+interface ListInsertResult<S extends SharedSignal<any>> {
+  readonly promise: Promise<boolean>,
+
+  readonly signal: S,
 }
 
 // Entry value for the root of a list
@@ -599,26 +601,35 @@ export class ValueSignal<T> extends SharedSignal<T> {
   this.set(value, true);
   }
 
-  set(value: T, eager: boolean): void {
+  set(value: T, eager: boolean): Promise<void> {
     const id = crypto.randomUUID();
     const event : SetEvent = { id, set: this.key, value};
-    this.eventLog.publish(event, eager);
+    return this.eventLog.publish(event, eager).then(_ => undefined);
   }
 
   compareAndSet(expectedValue: T, newValue: T, eager = true): Promise<boolean> {
     const id = crypto.randomUUID();
     const event : SetEvent = { id, set: this.key, value: newValue, conditions: [{id: this.key, value: expectedValue}]};
 
-     return this.eventLog.publish(event, eager);
+    return this.eventLog.publish(event, eager);
   }
 
   async update(updater: (value: T) => T): Promise<void> {
     // TODO detect accessing other signals and re-run if any of those are changed as well
+    // TODO conditional on last change id for the signal rather than the value itself to avoid the ABA problem
     while(!(await this.compareAndSet(this.value, updater(this.value)))) { }
   }
 }
 
-export class ListSignal<T = any, S extends SharedSignal<T> = SharedSignal<T>> extends SharedSignal<S[]> {
+function getKey(target: EntryReference): string {
+  if (typeof target == 'string') {
+    return target;
+  } else {
+    return target.key;
+  }
+}
+
+export class ListSignal<T = any, S extends ValueSignal<T> = ValueSignal<T>> extends SharedSignal<S[]> {
   private readonly eventLog: EventLog;
 
   constructor(key: EntryId, internalSignal: Signal, eventLog: EventLog) {
@@ -647,64 +658,50 @@ export class ListSignal<T = any, S extends SharedSignal<T> = SharedSignal<T>> ex
     this.eventLog = eventLog;
   }
 
-  get items(): T[] {
-    return this.value.map((signal) => signal.value);
+  get(key: EntryId): S | undefined {
+    // TODO: Avoid setting up a subscription
+    // TODO: Find the signal by id and verify that it's a child instead of looping through children
+    return this.value.find((signal) => signal.key == key);
   }
 
-  get keys(): string[] {
-    return this.value.map((signal) => signal.key as string);
+  get items(): ReadonlySignal<T[]> {
+    // TODO: Maybe lazy create and cache these computed signals?
+    return computed(() => this.value.map(({value}) => value));
   }
 
-  forEach(callback: (value: T, key: EntryId) => void) {
-    this.value.forEach((signal) => callback(signal.value, signal.key)); 
+  get entries(): ReadonlySignal<[T, EntryId][]> {
+    // TODO: Maybe lazy create and cache these computed signals?
+    return computed(() => this.value.map(({key, value}) => [value, key]));
   }
 
-  set(key: string, value: T) {
-    const id = crypto.randomUUID();
-    // XXX Prevent accidentally setting with a key that belongs to some other list?
-    const event : SetEvent= { id, set: key, value};
-    this.eventLog.publish(event, true);
-  }
-
-  insertLast(value: T): ListInsertResult {
+  insertLast(value: T): ListInsertResult<S> {
     const id = crypto.randomUUID();
     const event: InsertEvent = { entry: this.key, id, direction: "AFTER", reference: null, value };
-    return {key: id, promise: this.eventLog.publish(event, true)};
+    return {promise: this.eventLog.publish(event, true), signal: this.get(id)!};
   }
 
-  insertFirst(value: T): ListInsertResult {
+  insertFirst(value: T): ListInsertResult<S> {
     const id = crypto.randomUUID();
     const event: InsertEvent = { entry: this.key, id, direction: "BEFORE", reference: null, value };
-    return {key: id, promise: this.eventLog.publish(event, true)};
+    return {promise: this.eventLog.publish(event, true), signal: this.get(id)!};
   }
 
-  insertBefore(reference: string, value: T): ListInsertResult {
+  insertBefore(reference: EntryReference<S>, value: T): ListInsertResult<S> {
     const id = crypto.randomUUID();
-    const event: InsertEvent = { entry: this.key, id, direction: "BEFORE", reference, value };
-    return {key: id, promise: this.eventLog.publish(event, true)};    
+    const event: InsertEvent = { entry: this.key, id, direction: "BEFORE", reference: getKey(reference), value };
+    return {promise: this.eventLog.publish(event, true), signal: this.get(id)!};    
   }
 
-  insertAfter(reference: string, value: T): ListInsertResult {
+  insertAfter(reference: EntryReference<S>, value: T): ListInsertResult<S> {
     const id = crypto.randomUUID();
-    const event: InsertEvent = { entry: this.key, id, direction: "AFTER", reference, value };
-    return {key: id, promise: this.eventLog.publish(event, true)};    
+    const event: InsertEvent = { entry: this.key, id, direction: "AFTER", reference: getKey(reference), value };
+    return {promise: this.eventLog.publish(event, true), signal: this.get(id)!};    
   }
 
-  remove(key: string) {
+  remove(child: EntryReference<S>) {
     const id = crypto.randomUUID();
-    const event: RemoveEvent = { id, remove: key, parent: this.key};
+    const event: RemoveEvent = { id, remove: getKey(child), parent: this.key};
     this.eventLog.publish(event, true);
-  }
-
-  mapWithKey(mapper: (item: T, key: string) => ReactElement): ReactElement[] {
-    return this.value.map((signal) => {
-      const result = mapper.call(null, signal.value, signal.key);
-      if (result.key) {
-        return result;
-      } else {
-        return {...result, key: signal.key};
-      }
-    });
   }
 }
 
